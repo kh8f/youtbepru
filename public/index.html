@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>قصّر — اختصر رابطك لأسبوع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0e0b1f;--violet:#7c5cff;--mint:#3df5c0;--pink:#ff5c9d;--text:#f4f1ff}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--ink);color:var(--text);font-family:Rubik,system-ui,sans-serif;overflow-x:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(90px);opacity:.55;z-index:0;animation:drift 18s ease-in-out infinite alternate}
+.b1{width:420px;height:420px;background:var(--violet);top:-120px;right:-80px}
+.b2{width:380px;height:380px;background:var(--pink);bottom:-140px;left:-100px;animation-delay:-6s}
+.b3{width:280px;height:280px;background:var(--mint);top:45%;left:40%;opacity:.25;animation-delay:-11s}
+@keyframes drift{to{transform:translate(60px,-50px) scale(1.2)}}
+main{position:relative;z-index:1;width:min(560px,100%)}
+h1{font-size:clamp(2.6rem,9vw,4.2rem);font-weight:800;margin:0 0 6px;line-height:1.05;
+ background:linear-gradient(100deg,var(--mint),var(--violet) 55%,var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:shine 6s linear infinite}
+@keyframes shine{to{background-position:-200% 0}}
+.sub{margin:0 0 26px;opacity:.75}
+.card{padding:22px;border-radius:26px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(18px);display:grid;gap:12px}
+input{width:100%;padding:15px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(14,11,31,.55);color:var(--text);font:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus{border-color:var(--mint);box-shadow:0 0 0 4px rgba(61,245,192,.18)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.row{grid-template-columns:1fr}}
+button{padding:15px;border:0;border-radius:14px;font:inherit;font-weight:800;font-size:1.05rem;color:var(--ink);cursor:pointer;background:linear-gradient(100deg,var(--mint),#9d8bff);transition:transform .15s,filter .2s}
+button:hover{filter:brightness(1.1)}button:active{transform:scale(.97)}
+button:disabled{opacity:.6;cursor:wait}
+.err{color:#ff8fb6;min-height:1.2em;margin:0;font-size:.95rem}
+.res{display:none;margin-top:16px;padding:18px;border-radius:22px;background:rgba(61,245,192,.1);border:1px solid rgba(61,245,192,.45);position:relative;overflow:hidden}
+.res.show{display:block;animation:pop .55s cubic-bezier(.2,1.4,.4,1)}
+.res.show::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(61,245,192,.55),transparent 60%);animation:ring .9s ease-out forwards;pointer-events:none}
+@keyframes pop{from{opacity:0;transform:translateY(24px) scale(.9)}}
+@keyframes ring{from{transform:scale(.2);opacity:1}to{transform:scale(2.4);opacity:0}}
+.link{font-size:1.25rem;font-weight:800;direction:ltr;text-align:center;word-break:break-all;margin-bottom:12px}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem;opacity:.85}
+.copy{padding:9px 18px;font-size:.95rem;width:auto}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<main>
+  <h1>قصّر</h1>
+  <p class="sub">الصق الرابط الطويل، وخذ رابط قصير يعيش 7 أيام ثم يختفي.</p>
+  <div class="card">
+    <input id="url" type="url" inputmode="url" dir="ltr" placeholder="https://...">
+    <div class="row">
+      <input id="title" maxlength="70" placeholder="العنوان في الواتساب">
+      <input id="image" type="url" dir="ltr" placeholder="رابط الصورة (اختياري)">
+    </div>
+    <button id="go">اختصر الرابط</button>
+    <p class="err" id="err"></p>
+  </div>
+  <div class="res" id="res">
+    <div class="link" id="short"></div>
+    <div class="meta"><span id="exp"></span><button class="copy" id="copy">نسخ</button></div>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+$("go").onclick=async()=>{
+  $("err").textContent="";$("res").classList.remove("show");
+  $("go").disabled=true;
+  try{
+    const r=await fetch("/api/shorten",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({url:$("url").value,title:$("title").value,image:$("image").value})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error);
+    $("short").textContent=d.short;
+    $("exp").textContent="ينتهي يوم "+new Date(d.expires).toLocaleDateString("ar-SA",{weekday:"long",day:"numeric",month:"long"});
+    void $("res").offsetWidth;$("res").classList.add("show");
+  }catch(e){$("err").textContent=e.message||"صار خطأ، جرب مرة ثانية"}
+  $("go").disabled=false;
+};
+$("copy").onclick=async()=>{
+  try{await navigator.clipboard.writeText($("short").textContent);$("copy").textContent="تم النسخ"}catch{$("copy").textContent="انسخه يدوياً"}
+  setTimeout(()=>$("copy").textContent="نسخ",1800);
+};
+</script>
+</body>
+</html>
