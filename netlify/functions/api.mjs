@@ -1,8 +1,8 @@
 import { getStore } from "@netlify/blobs";
 
+const PASSWORD = "05058"; // باسورد الاختصار (يتحقق منه السيرفر فقط، ما يظهر للزوار)
 const DAY7 = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_TITLE = "رابط مميز لك";
-const DEFAULT_IMAGE = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRGJH3_ZQvwa5B3NQSWzlxJPW_nlS0eTQtv74M7FtxNAQ&s=10"; // غيّرها لصورتك
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const isHttp = (u) => { try { const p = new URL(u).protocol; return p === "http:" || p === "https:"; } catch { return false; } };
@@ -13,21 +13,23 @@ const newCode = () => {
 };
 
 const GONE = `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الرابط منتهي</title>
-<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0e0b1f;color:#f4f1ff;font-family:system-ui,sans-serif;text-align:center">
-<div><h1 style="font-size:2rem">انتهت صلاحية الرابط</h1><p style="opacity:.7">الروابط هنا تنحذف بعد 7 أيام.</p><a href="/" style="color:#3df5c0">اختصر رابط جديد</a></div></body></html>`;
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@600;700&display=swap" rel="stylesheet">
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(ellipse 700px 400px at 50% 0,rgba(255,15,43,.22),transparent 60%),#09090a;color:#f6f6f8;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;text-align:center">
+<div><h1 style="font-size:2rem;margin:0 0 8px">انتهت صلاحية الرابط</h1><p style="color:#93949c;margin:0 0 18px">الروابط هنا تنحذف بعد 7 أيام.</p><a href="/" style="color:#f2c14e">اختصر رابط جديد</a></div></body></html>`;
 const gone = (s) => new Response(GONE, { status: s, headers: { "content-type": "text/html;charset=utf-8" } });
 
 export default async (req) => {
   const url = new URL(req.url);
-  const store = getStore("links");
+  const store = getStore({ name: "links", consistency: "strong" });
 
-  if (req.method === "POST" && url.pathname === "/api/shorten") {
+  if (req.method === "POST") {
     let d;
     try { d = await req.json(); } catch { return json({ error: "طلب غير صالح" }, 400); }
+    if (d.password !== PASSWORD) return json({ error: "الباسورد غلط" }, 401);
     const target = (d.url || "").trim();
     if (!isHttp(target)) return json({ error: "الرابط لازم يبدأ بـ http أو https" }, 400);
     if (new URL(target).host === url.host) return json({ error: "ما ينفع تختصر رابط من نفس الموقع" }, 400);
-    const image = d.image && isHttp(d.image) ? d.image.trim() : DEFAULT_IMAGE;
+    const image = d.image && isHttp(d.image) ? d.image.trim() : url.origin + "/1.png"; // الصورة الافتراضية: public/1.png
     const title = (d.title || "").trim().slice(0, 70) || DEFAULT_TITLE;
 
     // تنظيف الروابط المنتهية (دفعة صغيرة في كل مرة)
@@ -35,7 +37,7 @@ export default async (req) => {
       const { blobs } = await store.list();
       for (const b of blobs.slice(0, 20)) {
         const v = await store.get(b.key, { type: "json" });
-        if (!v || v.expires < Date.now()) await store.delete(b.key);
+        if (v && v.expires < Date.now()) await store.delete(b.key);
       }
     } catch {}
 
